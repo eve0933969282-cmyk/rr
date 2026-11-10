@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>桃園市淨灘路線圖 </title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        #map { height: calc(100vh - 80px); }
+        @media (max-width: 768px) {
+            #map { height: calc(100vh - 64px); width: 100vw; }
+            .leaflet-container { width: 100% !important; height: 100% !important; }
+        }
+        .invisible-hotspot { cursor: pointer; }
+
+</head>
+
+   </style>
+
+
+<body class="bg-slate-50 text-slate-800 font-sans overflow-hidden antialiased">
+    <header class="h-16 md:h-20 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-6 z-50 relative shadow-sm">
+        <div class="flex items-center space-x-2 md:space-x-3">
+            <span class="text-xl md:text-2xl text-blue-600">🌊</span>
+            <div>
+                <h1 class="text-sm md:text-lg font-bold text-slate-900 tracking-tight">桃海揪團：海岸淨灘地圖平台</h1>
+                <p class="hidden sm:block text-[10px] text-slate-500 font-bold">2026年登記明細總覽</p>
+            </div>
+        </div>
+        
+        <div class="flex bg-slate-100 p-0.5 md:p-1 rounded-xl border border-slate-200 text-[11px] md:text-xs lg:text-sm max-w-[60%] overflow-x-auto">
+            <button id="btn-all" onclick="filterZone('all')" class="px-2 md:px-3 py-1.5 rounded-lg font-bold transition-all duration-200 bg-slate-800 text-white shadow whitespace-nowrap">
+                🌐 全部
+            </button>
+            <button id="btn-蘆竹區" onclick="filterZone('蘆竹區')" class="px-2 md:px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 text-slate-600 hover:bg-white whitespace-nowrap">
+                <span class="inline-block w-2 h-2 rounded-full bg-amber-500 mr-1"></span>蘆竹區
+            </button>
+            <button id="btn-大園區" onclick="filterZone('大園區')" class="px-2 md:px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 text-slate-600 hover:bg-white whitespace-nowrap">
+                <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1"></span>大園區
+            </button>
+            <button id="btn-觀音區" onclick="filterZone('觀音區')" class="px-2 md:px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 text-slate-600 hover:bg-white whitespace-nowrap">
+                <span class="inline-block w-2 h-2 rounded-full bg-cyan-500 mr-1"></span>觀音區
+            </button>
+            <button id="btn-新屋區" onclick="filterZone('新屋區')" class="px-2 md:px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 text-slate-600 hover:bg-white whitespace-nowrap">
+                <span class="inline-block w-2 h-2 rounded-full bg-indigo-500 mr-1"></span>新屋區
+            </button>
+                      
+        </div>
+<!-- 在原本的行政區按鈕組後面加入 -->
+<div class="flex items-center gap-2 border-l border-slate-200 pl-4 ml-4">
+    <button onclick="showPage('about')" class="text-xs font-bold text-slate-600 hover:text-blue-600">關於我們</button>
+    <button onclick="showPage('qa')" class="text-xs font-bold text-slate-600 hover:text-blue-600">常見問題 (Q&A)</button>
+</div>
+    </header>
+
+<main class="flex flex-col md:flex-row h-[calc(100vh-64px)] md:h-[calc(100vh-80px)] relative overflow-hidden">
+
+    <!-- 地圖容器 -->
+    <div id="map-container" class="flex-1 w-full h-full relative">
+        <div id="map" class="w-full h-full z-10 bg-slate-100"></div>
+    </div>
+
+    <!-- 內容頁 -->
+    <div id="content-page"
+     class="hidden absolute top-0 left-0 right-0 bottom-0 z-30 bg-white p-10 overflow-y-auto">
+        <button onclick="closePage()" class="mb-5 text-sm font-bold text-slate-500">
+            ← 返回地圖
+        </button>
+        <div id="page-body" class="max-w-2xl mx-auto prose"></div>
+    </div>
+
+    <!-- Sidebar -->
+    <div id="sidebar"
+        class="fixed bottom-0 left-0 right-0 md:relative md:bottom-auto md:left-auto md:right-auto z-40
+        w-full md:w-100 max-h-[55vh] md:max-h-none h-auto md:h-full
+        bg-white border-t md:border-t-0 md:border-l border-slate-200
+        p-5 md:p-6 overflow-y-auto flex flex-col justify-between
+        shadow-[0_-8px_30px_rgb(0,0,0,0.1)] md:shadow-xl
+        transform translate-y-full md:translate-y-0 transition-transform duration-300
+        rounded-t-2xl md:rounded-t-none">
+
+        <div class="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-4 md:hidden"></div>
+
+        <div id="sidebar-content" class="overflow-y-auto pr-1 space-y-4">
+
+            <div id="default-hint" class="hidden md:block text-center py-24 text-slate-400">
+                <span class="text-3xl block mb-3">🗺️</span>
+                <h3 class="text-sm font-bold text-slate-700 mb-1">
+                    請點選地圖上的海岸路線
+                </h3>
+                <p class="text-xs text-slate-400 leading-relaxed">
+                    可點選上方行政區標籤縮小檢索範圍。<br>
+                    點擊線段即可瀏覽該路段介紹與官方真實登記名單。
+                </p>
+            </div>
+
+            <div id="detail-view" class="hidden space-y-4">
+                <div class="flex justify-between items-center">
+                    <span id="info-zone"
+                        class="text-xs font-bold px-2.5 py-0.5 rounded-full border"></span>
+                    <span id="info-count-badge"
+                        class="text-[11px] font-bold"></span>
+                </div>
+
+                <div>
+                    <h2 id="info-title"
+                        class="text-base md:text-lg font-bold text-slate-900 leading-tight mb-1.5"></h2>
+                    <p id="info-desc"
+                        class="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-lg border border-slate-150"></p>
+                </div>
+
+                <div>
+                    <h3 class="text-xs font-bold text-slate-900 mb-3 flex items-center">
+                        <span class="mr-1.5">📋</span>
+                        平台登記活動明細
+                    </h3>
+
+                    <div id="company-list" class="space-y-3"></div>
+                </div>
+            </div>
+
+        </div>
+
+        <div id="sidebar-action"
+            class="hidden pt-3 border-t border-slate-150 mt-3 pb-2 md:pb-0">
+            <a href="https://ecolife2.moenv.gov.tw/coastal/"
+                target="_blank"
+                class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-2.5 px-4 rounded-xl text-center block text-xs shadow-sm">
+                前往海岸清理資訊平台 ➔
+            </a>
+        </div>
+
+    </div>
+
+</main>
+    <script>
+        const map = L.map('map', {
+            zoomControl: !L.Browser.mobile,
+            tap: !L.Browser.mobile
+        }).setView([25.06, 121.15], 11);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+
+        if(!L.Browser.mobile) {
+            L.control.zoom({ position: 'bottomleft' }).addTo(map);
+        }
+
+        // 🎨 行政區顏色對照表
+        const zoneColors = {
+            '蘆竹區': '#f59e0b', // 琥珀橘
+            '大園區': '#10b981', // 翡翠綠
+            '觀音區': '#06b6d4', // 天空藍
+            '新屋區': '#6366f1'  // 靛皮藍
+        };
+
+        // 📝 依據指定路段與真實政府截圖數據建置的資料庫
+        const taoyuanRoutes = [
+            // === 蘆竹區 ===
+            {
+                id: 1, zone: '蘆竹區', title: '海湖段',
+                note: '位於蘆竹區最北端的海湖海岸。此路段受地形與季風交匯影響，易堆積各類生活漂流物。目前截圖中該期間暫無登記活動。',
+                logs: [
+                    { time: '2026-05-23 09:30', group: '海湧工作室', people: 165 },                          
+                    { time: '2026-04-11 07:30', group: '桃園市蘆竹區濱海社區發展協會', people: 400 , type: '開放報名'},             
+                    { time: '2026-04-18 09:00', group: '救國團八德區團委會', people: 20 },                   
+                    { time: '2026-01-01 09:00', group: '國防大學陸軍指揮參謀學院', people: 20 },
+]
+            },
+            // === 大園區 ===
+            {
+                id: 2, zone: '大園區', title: '沙崙段',
+                note: '大園區沙崙里濱海路段。六月份為企業與民間團體極為熱門的淨灘重點區域，密集迎來大型清理活動。',
+                logs: [
+                    { time: '2026-11-21 09:00', group: '瑞健股份有限公司', people: 100 },
+                    { time: '2026-11-14 09:00', group: '瑞健股份有限公司', people: 100 },
+                    { time: '2026-11-07 09:00', group: '瑞健股份有限公司', people: 100 },
+                    { time: '2026-10-31 09:00', group: '瑞健股份有限公司', people: 100 },
+                    { time: '2026-10-03 10:00', group: '桃園市觀自在慈善會', people: 200 },
+                    { time: '2026-09-19 08:00', group: '荒野保護協會桃園分會', people: 400 },
+                    { time: '2026-08-09 06:30', group: '中油大潭海岸巡護隊', people: 56 },
+                    { time: '2026-06-13 08:00', group: '桃園市總工會', people: 700 },
+                    { time: '2026-06-07 09:00', group: '新聿科技股份有限公司', people: 80 },
+                    { time: '2026-06-06 10:00', group: '康迅旅行社', people: 200 },
+                    { time: '2026-06-06 09:00', group: '裕融企業股份有限公司', people: 100 },
+                    { time: '2026-05-30 09:00', group: '相信家族', people: 30 },
+                    { time: '2026-05-30 08:30', group: '財團法人一貫道寶光紹興崇華聖道基金會', people: 20 },
+                    { time: '2026-05-30 07:00', group: '凱基證券', people: 10 },
+                    { time: '2026-05-26 13:30', group: '桃園遠東百貨', people: 20 },
+                    { time: '2026-05-25 09:00', group: '天主教振聲高中', people: 42 },
+                    { time: '2026-05-23 15:00', group: '桃園市漁業發展協會', people: 30 , type: '開放報名'},
+                    { time: '2026-05-23 09:30', group: '銘傳大學慈濟青年聯誼社', people: 10 },
+                    { time: '2026-05-23 09:00', group: '瑞健股份有限公司', people: 100 },
+                    { time: '2026-05-20 13:00', group: '桃園市立文昌國中', people: 30 },
+                    { time: '2026-05-16 09:00', group: '品采', people: 500 },
+                    { time: '2026-05-15 14:30', group: '竹圍國中', people: 120 },
+                    { time: '2026-05-09 09:00', group: '瑞健股份有限公司', people: 100 },
+                    { time: '2026-04-26 10:00', group: '中原大學台南地區校友會', people: 30 },
+                    { time: '2026-04-25 09:00', group: '和運租車股份有限公司', people: 200 },
+                    { time: '2026-04-22 10:00', group: '中法鑫實業股份有限公司', people: 30 },
+                    { time: '2026-04-18 08:30', group: '樂趣灣國際有限公司', people: 30 },
+                    { time: '2026-04-18 08:00', group: '財團法人慈心有機農業發展基金會', people: 150 },
+                    { time: '2026-04-17 15:00', group: '萬商國際物流股份有限公司', people: 50 },
+                    { time: '2026-04-17 14:00', group: '明基材料股份有限公司', people: 60 },
+                    { time: '2026-04-11 13:00', group: '中華文化心靈教育發展協會', people: 20 },
+                    { time: '2026-04-11 07:00', group: '遊夥有限公司', people: 150 },
+                    { time: '2026-04-02 09:00', group: '新北市馬禮遜美國學校- 七年級生', people: 30 },
+                    { time: '2026-03-28 12:30', group: '中華文化心靈教育發展協會', people: 20 },
+                    { time: '2026-03-21 07:00', group: '技嘉科技股份有限公司', people: 200 },
+                    { time: '2026-03-14 09:00', group: '救國團八德區團委會', people: 20 },
+                    { time: '2026-03-07 13:00', group: '中華文化心靈教育發展協會', people: 20 },
+                    { time: '2026-02-26 10:00', group: '海湧工作室', people: 300 },
+                    { time: '2026-01-25 09:00', group: '第四期管理訓練班', people: 20 },
+                    { time: '2026-01-24 09:00', group: '小光點公益團', people: 150 },
+                    { time: '2026-01-11 08:00', group: '台灣騎手國際菲律賓組織協會', people: 60 }
+               ]
+            },
+            {
+                id: 3, zone: '大園區', title: '圳股頭段',
+                note: '位於大園區圳股頭沿線海岸。七月中旬已有民間環保志願團隊登記辦理守護台灣淨灘活動。',
+                logs: [
+                    { time: '2026-07-19 08:30', group: '一起手護台灣', people: 30 },
+                    { time: '2026-05-23 13:30', group: '海湧工作室', people: 80 },
+                    { time: '2026-04-26 08:30', group: '一起手護台灣', people: 30 },
+                    { time: '2026-04-23 10:30', group: '海湧工作室', people: 150 },
+                    { time: '2026-01-25 08:30', group: '一起手護台灣', people: 25 }
+                ]
+            },
+            {
+                id: 4, zone: '大園區', title: '內海許厝港段',
+                note: '屬於國家級重要濕地範圍，地形包含沙灘與礫石消波塊。目前截圖中該期間暫無登記活動。',
+                logs: [
+                    { time: '2026-06-06 09:00', group: '禾大國際管理顧問股份有限公司', people: 400, type: '開放報名' },
+                    { time: '2026-05-31 09:00', group: '桃園市國際熱愛大自然促進會', people: 80 },
+                    { time: '2026-05-24 09:00', group: '救國團八德區團委會', people: 20 },
+                    { time: '2026-05-23 09:30', group: '泰坦星球', people: 160 },
+                    { time: '2026-05-23 09:00', group: '桃園市基督恩惠關懷協會', people: 20 },
+                    { time: '2026-04-25 10:00', group: '酷客旅行社', people: 30 },
+                    { time: '2026-04-19 08:30', group: '台灣合銳材料科技股份有限公司', people: 20 },
+                    { time: '2026-04-18 08:00', group: '遊夥有限公司', people: 300 },
+                    { time: '2026-04-18 07:30', group: '遠東新世紀印染廠', people: 160 },
+                    { time: '2026-04-11 09:00', group: '第四期管理班', people: 40 },
+                    { time: '2026-03-28 07:00', group: '遊夥有限公司', people: 250 },
+                    { time: '2026-03-22 08:30', group: '大官', people: 20 },
+                    { time: '2026-03-08 12:30', group: '中原大學會計系系學會', people: 20 },
+                    { time: '2026-01-20 09:00', group: '大園國際高中', people: 65 }
+                    
+                ]
+            },
+            // === 觀音區 ===
+            {
+                id: 5, zone: '觀音區', title: '小飯壢溪至觀音溪',
+                note: '橫跨小飯壢溪口至觀音溪口之間，包含大潭藻礁保護區周邊海岸。為中油大潭海岸巡護隊與地方扶輪社長期巡護的高頻率指標路段。',
+                logs: [
+                    { time: '2026-08-09 06:30', group: '中油大潭海岸巡護隊', people: 56 },
+                    { time: '2026-08-01 10:00', group: '桃園市中壢中興扶輪社', people: 40 },
+                    { time: '2026-07-05 06:30', group: '中油大潭海岸巡護隊', people: 56 },
+                    { time: '2026-06-07 06:30', group: '中油大潭海岸巡護隊', people: 56 },
+                    { time: '2026-05-31 09:00', group: '社團法人中華民國英才環境保護暨發展協會', people: 40 },
+                    { time: '2026-05-23 08:00', group: '國立中央大學潛水社', people: 20 },
+                    { time: '2026-05-16 08:00', group: '中油大潭海岸巡護隊', people: 180 },
+                    { time: '2026-05-03 06:30', group: '中油大潭海岸巡護隊', people: 56 },
+                    { time: '2026-04-26 08:30', group: '和泰汽車', people: 3000 },
+                    { time: '2026-04-19 06:30', group: '中油大潭海岸巡護隊', people: 55 },
+                    { time: '2026-03-15 06:30', group: '中油大潭海岸巡護隊', people: 55 },
+                    { time: '2026-02-08 06:30', group: '中油大潭海岸巡護隊', people: 55 },
+                    { time: '2026-01-11 06:30', group: '中油大潭海岸巡護隊', people: 55 }
+                ]
+            },
+            {
+                id: 6, zone: '觀音區', title: '觀音溪至大堀溪',
+                note:'此路段包含觀音海岸重要生態區域，常有企業與環保團體進行大型清理活動。',
+                logs: [
+                    { time: '2026-10-03 08:00', group: '友達永續基金會', people: 60 },
+                    { time: '2026-08-09 06:30', group: '中油大潭海岸巡護隊', people: 56 },
+                    { time: '2026-08-01 10:00', group: '桃園市中壢中興扶輪社', people: 40 },
+                    { time: '2026-07-05 06:30', group: '中油大潭海岸巡護隊', people: 56 },
+                    { time: '2026-06-07 06:30', group: '中油大潭海岸巡護隊', people: 56 },
+                    { time: '2026-06-06 08:00', group: '康廷工程顧問企業有限公司', people: 800 },
+                    { time: '2026-04-27 09:30', group: '絃瑞科技股份有限公司', people: 20 },
+                    { time: '2026-04-25 08:00', group: '環境友善種子股份有限公司', people: 60 },
+                    { time: '2026-04-23 14:00', group: '宜家家居股份有限公司', people: 60 },
+                    { time: '2026-04-21 10:00', group: '新世界美語', people: 38 },
+                    { time: '2026-04-18 09:00', group: '凱基證券', people: 20 },
+                    { time: '2026-04-11 08:30', group: '桃園市社區志工推展協會', people: 300 },
+                    { time: '2026-03-06 09:00', group: '觀音高中', people: 150 },
+                    { time: '2026-01-18 14:00', group: '桃園市平鎮區文化街35巷5號4樓', people: 15 }
+]
+            },
+            {
+                id: 7, zone: '觀音區', title: '大堀溪至富林溪',
+                note: '位於大堀溪口至富林溪口交界。六月中旬將由環境教育協會舉辦附帶完整環境通識宣導之淨灘活動。',
+                logs: [
+                    { time: '2026-06-13 15:00', group: '社團法人台灣重新思考環境教育協會', people: 50,  type: '開放報名' }
+                ]
+            },
+            {
+                id: 8, zone: '觀音區', title: '富林溪至樹林後溪',
+                note: '觀音區鄰近工業排水流域之海岸，容易有卡在石縫中的海漂垃圾。本季有里辦公處與民間協會積極動員投入。',
+                logs: [
+                    { time: '2026-08-09 06:30', group: '中油大潭海岸巡護隊', people: 56 },
+                    { time: '2026-06-28 09:00', group: '桃園市中壢區山東里辦公處', people: 120 },
+                    { time: '2026-06-14 10:00', group: '台灣玉山創建會', people: 50 },
+                    { time: '2026-05-24 09:00', group: '自組團隊', people: 25 },
+                    { time: '2026-04-19 09:30', group: '巴恩斯航太股份有限公司', people: 60 },
+                    { time: '2026-04-18 14:30', group: '桃園市環境教育文創協會', people: 1000 },
+                    { time: '2026-03-29 09:00', group: '社團法人中華民國英才環境保護暨發展協會', people: 40 },
+                    { time: '2026-03-28 13:30', group: '桃園市智善行愛心關懷協會', people: 50 , type: '開放報名'}
+                ]
+            },
+            // === 新屋區 ===
+            {
+                id: 9, zone: '新屋區', title: '永安漁港北岸第1段',
+                note: '永安漁港北側第一段主要海岸線。九月中旬由區公所發起大規模、高人數的官方環境整修。',
+                logs: [
+                    { time: '2026-09-12 07:00', group: '桃園市新屋區公所', people: 170 },
+                    { time: '2026-05-30 08:00', group: '中台資源科技股份有限公司', people: 50 },
+                    { time: '2026-05-22 14:00', group: '中原大學服務學習中心', people: 15 },
+                    { time: '2026-05-20 13:00', group: '桃園市立內壢高中', people: 110 },
+                    { time: '2026-04-27 16:00', group: '美商蒂芙尼國際股份有限公司（Tiffany & Co.）', people: 25 },
+                    { time: '2026-04-18 14:00', group: '清華大學通識中心', people: 42 },
+                    { time: '2026-03-21 08:00', group: '中台資源科技股份有限公司', people: 50 },
+                    { time: '2026-01-10 09:00', group: '救國團八德區團委會', people: 20 }                ]
+            },
+            {
+                id: 10, zone: '新屋區', title: '永安漁港北岸第2段',
+                note: '北岸中後段防風林與濱海步道交接處。六月中旬將迎來大專院校青年學生的自主淨灘活動。',
+                logs: [
+                    { time: '2026-06-13 15:00', group: '中央大學轉學轉系生聯誼會', people: 25 },
+                    { time: '2026-06-06 09:00', group: '恬恬旅行社', people: 51 },
+                    { time: '2026-05-23 09:00', group: '興普科技股份有限公司', people: 70 },
+                    { time: '2026-05-10 10:00', group: '玩霸教育', people: 30 , type: '開放報名'},
+                    { time: '2026-05-09 09:00', group: '社團法人國際戶外教育學會', people: 100 },
+                    { time: '2026-04-26 14:00', group: '元智大學學務處生輔組', people: 28 },
+                    { time: '2026-04-12 13:30', group: '食彧有限公司', people: 25 },
+                    { time: '2026-04-11 09:00', group: '和運租車股份有限公司', people: 50 }                 ]
+            },
+            {
+                id: 11, zone: '新屋區', title: '永安漁港南岸第3段',
+                note: '永安漁港南側濱海段。六月份有區公所與在地知名製造業企業攜手，進行密集的維護。',
+                logs: [
+                    { time: '2026-06-27 07:00', group: '桃園市新屋區公所', people: 170 },
+                    { time: '2026-06-06 09:30', group: '台灣林內工業股份有限公司', people: 50 },
+                    { time: '2026-06-06 09:00', group: '中華民國有機生活環境教育推廣協會', people: 30 },
+                    { time: '2026-06-06 08:00', group: '榮鼎綠能(股)公司', people: 60 },
+                    { time: '2026-05-23 13:00', group: '財團法人聯詠科技教育基金會、台中惠明學校、台中啟明學校', people: 50 },
+                    { time: '2026-04-22 10:00', group: '桃園市何嘉仁平鎮幼兒園', people: 30 },
+                    { time: '2026-04-11 08:30', group: '榮鼎綠能(股)公司', people: 60 },
+                    { time: '2026-03-28 09:00', group: '富邦人壽保險股份有限公司桃暘分處', people: 80 },
+                    { time: '2026-03-20 15:00', group: '桃園市新屋區海洋客家休閒農業發展協會', people: 40 },
+                    { time: '2026-03-17 15:00', group: '中壢高中', people: 30 },
+                    { time: '2026-03-08 09:00', group: '元智大學崇德青年志工社', people: 20 },
+                    { time: '2026-03-07 09:00', group: '國立中央大學僑聯社', people: 40 },
+                    { time: '2026-01-21 09:00', group: '華潤旅行社(萬興國小)', people: 120 }                ]
+            },
+            {
+                id: 12, zone: '新屋區', title: '永安漁港南岸第4段',
+                note: '新屋著名綠色隧道與觀海亭延伸之南岸末端段。目前截圖中該期間暫無登記活動。',
+                logs: [
+                    { time: '2026-06-06 09:00', group: '日月光半導體製造股份有限公司中壢分公司', people: 300 },
+                    { time: '2026-05-23 08:30', group: '中華民國有機生活環境教育推廣協會', people: 85 },
+                    { time: '2026-05-17 14:00', group: '桃園市快樂呼吸健康促進協會', people: 20 },
+                    { time: '2026-05-16 07:00', group: '桃園市新屋區公所', people: 130 },
+                    { time: '2026-04-26 09:00', group: '桃苗汽車', people: 600 },
+                    { time: '2026-01-21 10:00', group: '華生株式會社', people: 50 }]
+},
+{
+    id: 13, zone: '觀音區', title: '樹林後溪至海湖',
+    note: '此路段為連貫海岸線。截至目前，本年度與本月份累積淨灘場次均為 0 筆。',
+    logs: [] // 設定為空陣列
+},
+        ];
+
+        // 各路段真實經緯度邊界線段數據
+        const routePathsMap = {
+            1: [[25.1325, 121.2570], [25.1220, 121.2400]], // 蘆竹 海湖段
+            2: [[25.1220, 121.2400], [25.1065, 121.2100]], // 大園 沙崙段
+            3: [[25.1065, 121.2100], [25.0980, 121.1935]], // 大園 圳股頭段
+            4: [[25.0980, 121.1935], [25.0895, 121.1765]], // 大園 內海許厝港段
+            5: [[25.0390, 121.0530], [25.0210, 121.0400]], // 觀音 小飯壢溪至觀音溪
+            6: [[25.0520, 121.0920], [25.0390, 121.0530]], // 觀音 觀音溪至大堀溪
+            7: [[25.0780, 121.1550], [25.0655, 121.0990]], // 觀音 大堀溪至富林溪
+            8: [[25.0895, 121.1765], [25.0780, 121.1550]], // 觀音 富林溪至樹林後溪
+            9: [[25.0210, 121.0400], [25.0110, 121.0310]],// 新屋 永安漁港北岸第1段
+            10: [[25.0110, 121.0310], [25.0015, 121.0195]], // 新屋 永安漁港北岸第2段0360
+            11: [[25.0015, 121.0195], [24.9820, 121.0165]], // 新屋 永安漁港南岸第3段
+            12: [[24.9820, 121.0165], [24.9425, 120.9860]], // 新屋 永安漁港南岸第4段
+            13: [[25.0655, 121.0990], [25.0520, 121.0920]]
+        };
+
+        let lineLayersStore = {}; 
+        let lineGroup = L.layerGroup().addTo(map);
+
+        function renderMap() {
+            lineGroup.clearLayers();
+            lineLayersStore = {};
+
+            taoyuanRoutes.forEach(route => {
+                const pathCoords = routePathsMap[route.id];
+                if (!pathCoords) return;
+
+                // 核心改動：依行政區設定專屬色系
+                const routeColor = zoneColors[route.zone] || '#0284c7';
+
+                const visualLine = L.polyline(pathCoords, {
+                    color: routeColor,
+                    weight: 5.5,
+                    opacity: 0.85,
+                    lineCap: 'round',
+                    lineJoin: 'round'
+                });
+
+                const invisibleHotspot = L.polyline(pathCoords, {
+                    color: routeColor,
+                    weight: 32,
+                    opacity: 0,
+                    lineCap: 'round',
+                    lineJoin: 'round',
+                    className: 'invisible-hotspot'
+                });
+
+                const triggerSelect = () => {
+                    // 還原所有線段的基本粗細與顏色
+                    Object.keys(lineLayersStore).forEach(id => {
+                        const r = taoyuanRoutes.find(x => x.id == id);
+                        lineLayersStore[id].visual.setStyle({ weight: 5.5, opacity: 0.85, color: zoneColors[r.zone] });
+                    });
+                    // 強調被選中的路段
+                    visualLine.setStyle({ weight: 10, opacity: 1 });
+                    updateSidebarDetails(route);
+                };
+
+                invisibleHotspot.on('mouseover', () => { visualLine.setStyle({ weight: 8.5, opacity: 1 }); });
+                invisibleHotspot.on('mouseout', () => {
+                    if (document.getElementById('info-title').innerText !== route.title) {
+                        visualLine.setStyle({ weight: 5.5, opacity: 0.85 });
+                    }
+                });
+
+                invisibleHotspot.on('click', triggerSelect);
+                visualLine.on('click', triggerSelect);
+
+                lineGroup.addLayer(visualLine);
+                lineGroup.addLayer(invisibleHotspot);
+
+                lineLayersStore[route.id] = { visual: visualLine, hotspot: invisibleHotspot, zone: route.zone };
+            });
+        }
+
+        // 渲染詳細側邊欄
+     // 渲染詳細側邊欄
+        function updateSidebarDetails(route) {
+            document.getElementById('default-hint').classList.add('hidden');
+            document.getElementById('detail-view').classList.remove('hidden');
+            document.getElementById('sidebar-action').classList.remove('hidden');
+
+            document.getElementById('info-title').innerText = route.title;
+            
+            const infoZone = document.getElementById('info-zone');
+            infoZone.innerText = `📍 桃園市 ${route.zone}`;
+            
+            if (route.zone === '蘆竹區') infoZone.className = 'text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full';
+            else if (route.zone === '大園區') infoZone.className = 'text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full';
+            else if (route.zone === '觀音區') infoZone.className = 'text-xs font-bold text-cyan-700 bg-cyan-50 border border-cyan-200 px-2.5 py-0.5 rounded-full';
+            else if (route.zone === '新屋區') infoZone.className = 'text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-full';
+
+            document.getElementById('info-desc').innerText = route.note;
+
+            const countBadge = document.getElementById('info-count-badge');
+            const listContainer = document.getElementById('company-list');
+            let listHtml = ''; // 必須在這裡初始化
+
+            if (route.logs.length > 0) {
+                countBadge.innerText = `已登記活動：${route.logs.length} 筆`;
+                countBadge.className = 'text-[11px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-150';
+
+                route.logs.forEach(log => {
+                    // --- 這邊是新增的邏輯，確保在迴圈內 ---
+                    const publicTag = log.type === '開放報名' 
+                        ? `<span class="ml-2 px-1.5 py-0.5 text-[10px] font-bold bg-emerald-500 text-white rounded">開放報名</span>` 
+                        : '';
+                    
+                    listHtml += `
+                        <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm space-y-1.5 relative overflow-hidden">
+                            <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-slate-400" style="background-color: ${zoneColors[route.zone]}"></div>
+                            <div class="flex justify-between items-start pl-1">
+                                <span class="text-xs font-bold text-slate-900 leading-tight block max-w-[75%]">${log.group}</span>
+                                <span class="text-xs font-extrabold text-slate-700 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">👥 ${log.people} 人</span>
+                            </div>
+                            <div class="flex items-center text-[11px] text-slate-500 font-medium pl-1">
+                                <span class="mr-1">📅 時間：</span>
+                                <span class="text-slate-700 font-semibold">${log.time}</span>
+                                ${publicTag}
+                            </div>
+                        </div>
+                    `;
+                });
+            } else {
+                countBadge.innerText = '目前無登記';
+                countBadge.className = 'text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200';
+                listHtml = `<div class="text-center py-8 bg-slate-50/50 rounded-xl border border-dashed border-slate-200 text-slate-400"><p class="text-xs">本時段此路段於官方平台暫無登記活動</p></div>`;
+            }
+            listContainer.innerHTML = listHtml;
+
+            if (window.innerWidth <= 768) {
+                document.getElementById('sidebar').classList.remove('translate-y-full');
+            }
+        }
+        // 🎯 點擊頂部行政區按鈕：連動高亮指定色彩，淡化非選定行政區
+        function filterZone(zoneName) {
+            const zones = ['all', '蘆竹區', '大園區', '觀音區', '新屋區'];
+            
+            zones.forEach(z => {
+                const btn = document.getElementById(`btn-${z}`);
+                if (btn) btn.className = 'px-2 md:px-3 py-1.5 rounded-lg font-semibold transition-all duration-200 text-slate-600 hover:bg-white whitespace-nowrap';
+            });
+            document.getElementById(`btn-${zoneName}`).className = 'px-2 md:px-3 py-1.5 rounded-lg font-bold transition-all duration-200 bg-slate-800 text-white shadow whitespace-nowrap';
+
+            Object.keys(lineLayersStore).forEach(id => {
+                const layerSet = lineLayersStore[id];
+                const r = taoyuanRoutes.find(x => x.id == id);
+
+                if (zoneName === 'all' || layerSet.zone === zoneName) {
+                    layerSet.visual.setStyle({
+                        weight: zoneName === 'all' ? 5.5 : 8.5,
+                        opacity: 1,
+                        color: zoneColors[r.zone]
+                    });
+                } else {
+                    layerSet.visual.setStyle({
+                        weight: 2,
+                        opacity: 0.1,
+                        color: '#cbd5e1' // 非選中行政區淡化為淡灰色
+                    });
+                }
+            });
+
+            if (window.innerWidth <= 768) {
+                document.getElementById('sidebar').classList.add('translate-y-full');
+            }
+            document.getElementById('default-hint').classList.remove('hidden');
+            document.getElementById('detail-view').classList.add('hidden');
+            document.getElementById('sidebar-action').classList.add('hidden');
+        }
+
+       // 統一處理點擊邏輯，避免手機版沒反應
+function onFeatureClick(route) {
+    updateSidebarDetails(route); // 呼叫您的詳細資訊更新函式
+    
+    // 強制處理手機版彈出
+    if (window.innerWidth <= 768) {
+        const sidebar = document.getElementById('sidebar');
+        sidebar.classList.remove('translate-y-full'); // 確保側邊欄移上來
+        sidebar.style.display = 'block'; // 強制顯示
+    }
+}
+
+// 綁定到您的地圖點擊事件中
+map.on('click', function(e) {
+    // 如果您原本是點擊圖層 (layer) 才觸發，請確保這裡有呼叫 onFeatureClick
+    // 範例：
+    // layer.on('click', () => onFeatureClick(route));
+});
+
+        // 啟動地圖
+        renderMap();
+
+
+const pages = {
+    about: {
+        title: "關於我們",
+        content:  `
+            <section class="mb-10">
+                <h3 class="text-xl font-bold mb-3 text-blue-700">團隊故事</h3>
+                <p class="text-slate-600 leading-relaxed mb-6">我們是一群來自桃園的學生，因為一次服務學習課程，讓我們真正踏上桃園的海岸線。那一刻我們才發現，守護海洋的行動不應該只有在課堂的簡報裡，更應該發生在日常生活中。然而，我們發現許多熱心的市民想參與淨灘，卻往往被散落各處的資訊給勸退。</p>
+                <p class="text-slate-600 leading-relaxed">於是，我們決定運用所學，打造一個最簡單、最直覺的平台。我們沒有複雜的封面與多餘的動效，就是為了讓大家能把時間留給更重要的事——實際走入海邊，為桃園留下一片純淨。</p>
+            </section>
+
+            <section class="mb-10">
+                <h3 class="text-xl font-bold mb-4 text-blue-700">網站使用說明</h3>
+                <div class="space-y-4">
+                    <div class="flex items-start gap-4">
+                        <div class="text-2xl">🗺️</div>
+                        <div><p class="font-bold">Step 1：打開地圖</p><p class="text-slate-500">進入首頁，直接瀏覽我們為您整理好的桃園海岸線地圖。</p></div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <div class="text-2xl">🖱️</div>
+                        <div><p class="font-bold">Step 2：點擊路線</p><p class="text-slate-500">在地圖上選擇您感興趣的海岸區段，查看該區域目前的淨灘規劃。</p></div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <div class="text-2xl">📝</div>
+                        <div><p class="font-bold">Step 3：選擇目標</p><p class="text-slate-500">點擊您想參與的路線，即可獲取詳細活動資訊與報名詳情，揪上好友即可出發！</p></div>
+                    </div>
+                </div>
+                <div class="mt-8">
+                    <button onclick="closePage()" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-700 transition">立即查看淨灘地圖</button>
+                </div>
+            </section>
+
+            <section class="mb-10 border-t pt-8">
+                <h3 class="text-xl font-bold mb-3 text-blue-700">資料來源</h3>
+                <p class="text-slate-600 leading-relaxed">本網站的所有淨灘活動資訊，均統一由官方「海岸管理資訊系統」平台同步轉載，並由我們的團隊進行分類整理。我們致力於讓資訊透明化，確保您報名的每一場活動都能確實對環境產生正面影響。</p>
+            </section>
+
+            <section class="mb-10 bg-slate-50 p-6 rounded-xl">
+                <h3 class="text-xl font-bold mb-3 text-blue-700">聯絡與回饋</h3>
+                <p class="text-slate-600 mb-4">您的支持與回饋，是我們持續優化平台最大的動力。</p>
+                <p class="text-slate-600">電子郵件：BeachcleanupinTaoyuan@email.com</p>
+                <p class="text-slate-600">客服專線： <a href="#" class="text-blue-600 underline">0964-537-128</a></p>
+            </section>
+        `
+    },
+
+  qa: {
+    title: "常見問題 (Q&A)",
+    content: `
+        <div class="space-y-4">
+
+            <details class="group bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition">
+                <summary class="flex justify-between items-center cursor-pointer list-none font-bold text-slate-800">
+                    <span>Q1：政府網站已經有淨灘資訊，為什麼還要開發這個網站？</span>
+                    <span class="group-open:rotate-180 transition">⌄</span>
+                </summary>
+                <p class="mt-4 text-slate-600 leading-relaxed">
+                    政府官網雖然資料完整，但往往涵蓋全台資訊與行政內容，對想利用週末空檔參與淨灘的市民而言較不直觀。
+                    我們專注於桃園海岸，透過地圖直接呈現活動位置，希望讓尋找淨灘活動變得像查詢咖啡廳一樣簡單。
+                </p>
+            </details>
+
+            <details class="group bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition">
+                <summary class="flex justify-between items-center cursor-pointer list-none font-bold text-slate-800">
+                    <span>Q2：我們只是學生，這個網站真的能幫到忙嗎？</span>
+                    <span class="group-open:rotate-180 transition">⌄</span>
+                </summary>
+                <p class="mt-4 text-slate-600 leading-relaxed">
+                    當然可以！許多淨灘活動最需要的是參與人力。
+                    我們希望透過簡單直覺的操作方式，降低大家參與環境行動的門檻，
+                    讓更多青年願意走出戶外，一起守護桃園海岸。
+                </p>
+            </details>
+
+            <details class="group bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition">
+                <summary class="flex justify-between items-center cursor-pointer list-none font-bold text-slate-800">
+                    <span>Q3：地圖資料多久更新一次？</span>
+                    <span class="group-open:rotate-180 transition">⌄</span>
+                </summary>
+                <p class="mt-4 text-slate-600 leading-relaxed">
+                    我們會定期同步官方平台資料，並每週進行人工檢核。
+                    若發現資訊錯誤或活動內容有異動，也歡迎透過聯絡我們回報。
+                </p>
+            </details>
+
+            <details class="group bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition">
+                <summary class="flex justify-between items-center cursor-pointer list-none font-bold text-slate-800">
+                    <span>Q4：沒有淨灘經驗可以參加嗎？</span>
+                    <span class="group-open:rotate-180 transition">⌄</span>
+                </summary>
+                <p class="mt-4 text-slate-600 leading-relaxed">
+                    完全可以。大多數活動都會提供現場教學與安全說明。
+                    您只需要攜帶飲水、防曬用品，以及一顆願意守護海洋的心即可。
+                </p>
+            </details>
+
+            <details class="group bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition">
+                <summary class="flex justify-between items-center cursor-pointer list-none font-bold text-slate-800">
+                    <span>Q5：可以看到其他人的淨灘成果嗎？</span>
+                    <span class="group-open:rotate-180 transition">⌄</span>
+                </summary>
+                <p class="mt-4 text-slate-600 leading-relaxed">
+                    目前網站以資訊整合與活動查詢為主。
+                    未來希望新增成果分享專區，讓大家能交流淨灘心得與照片，
+                    一起見證桃園海岸的改變。
+                </p>
+            </details>
+
+        </div>
+
+        <div class="mt-10 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-2xl p-6 border border-blue-100">
+            <h3 class="text-lg font-bold text-blue-700 mb-2">
+                找不到想問的問題？
+            </h3>
+            <p class="text-slate-600 mb-4">
+                歡迎透過聯絡我們與團隊聯繫，我們會盡快回覆您的問題與建議。
+            </p>
+            <button onclick="showPage('about')"
+                class="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 transition">
+                聯絡我們
+            </button>
+        </div>
+    `
+     }
+};   
+  
+
+
+   function showPage(pageId) {
+    const pageContainer = document.getElementById('content-page');
+    const pageBody = document.getElementById('page-body');
+
+    pageContainer.classList.remove('hidden');
+
+    pageBody.innerHTML = `
+        <h1 class="text-3xl font-bold mb-6">${pages[pageId].title}</h1>
+        ${pages[pageId].content}
+    `;
+}
+function closePage() {
+    document.getElementById('map').style.display = 'block';
+    document.getElementById('sidebar').style.display = 'flex';
+    document.getElementById('content-page').classList.add('hidden');
+    
+    if (typeof map !== 'undefined') {
+        map.invalidateSize();
+    }
+}
+
+   </script>
+</body>
+</html>
